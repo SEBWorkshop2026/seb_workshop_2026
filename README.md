@@ -41,3 +41,27 @@ The GCS backend supports state locking, but all operators must use the same
 bucket and backend prefix.
 
 GCP budgets send alerts; they do not stop spending.
+
+## BigQuery and Dataform
+
+BigQuery and Dataform APIs are enabled in every project, including the shared
+project, even when `enabled_apis` is customized. Each participant project has
+its own `dataform-workflows` service account with BigQuery data editor and job
+user roles. Assigned participants get BigQuery data editor and job user,
+Dataform editor, and permission to use their project's execution account. The
+Dataform service agent can impersonate that account for workflow execution.
+
+When creating a Dataform repository, select the project's
+`dataform-workflows` service account. Run `terraform output
+dataform_service_accounts` to see the account for each project. Assign
+participants through `assignments` and re-apply Terraform to grant them access.
+The shared project grants BigQuery data viewer to assigned participants, extra
+shared viewers, and each project's Dataform execution account, allowing queries
+and workflows to read shared datasets. Jobs should run in the participant's
+project; access to shared data does not grant shared-project job creation.
+Dataset-level restrictions, organization policies, or location mismatches can
+still prevent access or queries.
+
+These roles allow participants to create BigQuery jobs and modify data in their
+own projects, and to run Dataform workflows using the execution account.
+BigQuery usage can incur charges, and budgets do not enforce a spending limit.

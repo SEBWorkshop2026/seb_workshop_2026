@@ -48,7 +48,7 @@ variable "budget_alert_thresholds" {
 }
 
 variable "enabled_apis" {
-  description = "APIs enabled in every workshop project (the shared template)."
+  description = "Additional APIs enabled in every workshop project. BigQuery and Dataform are always enabled."
   type        = list(string)
   default = [
     "compute.googleapis.com",
