@@ -2,3 +2,5 @@
 *.tfstate*
 terraform.tfvars
 *.auto.tfvars
+.venv/
+__pycache__/

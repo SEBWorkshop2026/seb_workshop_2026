@@ -65,3 +65,40 @@ still prevent access or queries.
 These roles allow participants to create BigQuery jobs and modify data in their
 own projects, and to run Dataform workflows using the execution account.
 BigQuery usage can incur charges, and budgets do not enforce a spending limit.
+
+## Load synthetic banking data
+
+After applying Terraform, authenticate application default credentials with
+`gcloud auth application-default login`.
+An administrator with BigQuery dataset creation, table creation/update, and job
+creation permissions in the shared project can run:
+
+```sh
+uv run --project sample_data sample-data --project "$(terraform output -raw shared_project)"
+```
+
+By default this creates the `banking_sample` dataset in the `EU` location and
+generates 10,000 arrangements, using a fixed seed and snapshot date
+(`2026-01-01`). Use `--dataset`, `--location`, `--count`, and `--seed` to
+override those defaults. If the dataset already exists, its location must
+match `--location`. BigQuery queries that join these tables with participant
+data must use the same location.
+
+**Each run replaces the seven sample tables**; other tables are untouched.
+Loads happen one table at a time, so a failed run can leave a mixture of old
+and new tables. Re-run the command to finish. BigQuery jobs and storage may
+incur charges. All records are synthetic and use EUR:
+
+| Table | Contents |
+| --- | --- |
+| `debtors` | Debtor ID, annual income, monthly money at disposal, and employment status |
+| `arrangements` | Arrangement and debtor IDs, origination and maturity dates, and status |
+| `balance_sheet` | Two rows per arrangement: principal and accrued interest at the snapshot date |
+| `properties` | Property ID and value |
+| `deeds` | Deed ID and its property ID |
+| `collaterals` | Arrangement-to-deed links, property ID, and encumbrance |
+| `defaults` | Defaulted arrangement ID and default date |
+
+Join arrangements to debtors on `debtor_id`, to balances and defaults on
+`ar_id`, and to properties through `collaterals` and `deeds`. Multiple
+arrangements can share a deed, and an arrangement can have multiple deeds.
