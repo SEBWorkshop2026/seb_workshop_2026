@@ -42,6 +42,23 @@ bucket and backend prefix.
 
 GCP budgets send alerts; they do not stop spending.
 
+## Sync Terraform variables
+
+After signing in with `gcloud auth login`, use the existing state bucket to
+transfer your ignored `terraform.tfvars` between laptops:
+
+```sh
+./scripts/tfvars.sh upload
+./scripts/tfvars.sh download
+```
+
+Both commands default to the `ws2026-tfstate` bucket; pass a different bucket
+name as the second argument if needed. Download refuses to overwrite a local
+file: move it aside first if you want to replace it. Upload replaces the
+remote copy. Sync is manual, so download before editing and upload after
+changes. Anyone with sufficient bucket access can read both the variables and
+the Terraform state; restrict that access accordingly.
+
 ## BigQuery and Dataform
 
 BigQuery and Dataform APIs are enabled in every project, including the shared
