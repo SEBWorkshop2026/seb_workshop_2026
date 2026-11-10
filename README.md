@@ -42,6 +42,39 @@ bucket and backend prefix.
 
 GCP budgets send alerts; they do not stop spending.
 
+## Organization administrators
+
+To grant the five organization-level administrator roles to individual Google
+accounts, set the numeric organization ID and bare user email addresses in
+`terraform.tfvars`:
+
+```hcl
+org_id = "123456789012"
+admin_users = [
+  "admin1@example.com",
+  "admin2@example.com",
+]
+```
+
+`admin_users` defaults to empty. Set `org_id` even if `folder_id` is set;
+projects will still be created in the folder. Apply the configuration using an
+account that can manage the organization's IAM policy. Terraform grants each
+user IAM Workforce Pool Admin, Organization Administrator, Project Creator,
+Project Mover, and Service Usage Admin. These organization-wide grants affect
+the whole organization, not just workshop projects. Removing a user from the
+list or destroying this configuration removes the grants managed by Terraform.
+Review the plan before applying, especially if a role is already granted
+outside Terraform: import existing grants rather than managing the same grant
+in multiple places.
+
+These roles alone do **not** give direct access to every project, the state
+bucket, or the billing account, and do not by themselves provide all permissions
+needed to run this configuration. Provision the necessary project, storage,
+and billing permissions separately. Organization Administrator can change
+organization IAM, so these users can potentially grant themselves broader
+access. The bootstrap admin project must be under the organization for
+organization-level permissions to apply to it.
+
 ## Sync Terraform variables
 
 After signing in with `gcloud auth login`, use the existing state bucket to

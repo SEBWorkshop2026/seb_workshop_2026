@@ -9,15 +9,28 @@ variable "billing_account_id" {
 }
 
 variable "org_id" {
-  description = "Organization ID. Set either org_id or folder_id."
+  description = "Organization ID. Required for admin_users even when projects are created under folder_id."
   type        = string
   default     = null
 }
 
 variable "folder_id" {
-  description = "Folder ID (digits only). Set either org_id or folder_id."
+  description = "Folder ID (digits only). When set, projects are created in this folder instead of directly under org_id."
   type        = string
   default     = null
+}
+
+variable "admin_users" {
+  description = "Google user account emails granted the administrator roles at the organization level."
+  type        = set(string)
+  default     = []
+
+  validation {
+    condition = alltrue([
+      for email in var.admin_users : can(regex("^[^[:space:]@:]+@[^[:space:]@:]+$", email))
+    ])
+    error_message = "admin_users must contain bare user email addresses without whitespace or IAM prefixes."
+  }
 }
 
 variable "name_prefix" {

@@ -4,6 +4,33 @@ locals {
   all_assigned_emails = distinct(flatten(values(var.assignments)))
   shared_viewers      = distinct(concat(local.all_assigned_emails, var.shared_project_viewers))
   enabled_apis        = setunion(toset(var.enabled_apis), toset(["bigquery.googleapis.com", "dataform.googleapis.com"]))
+
+  admin_roles = toset([
+    "roles/iam.workforcePoolAdmin",
+    "roles/resourcemanager.organizationAdmin",
+    "roles/resourcemanager.projectCreator",
+    "roles/resourcemanager.projectMover",
+    "roles/serviceusage.serviceUsageAdmin",
+  ])
+  admin_bindings = {
+    for pair in setproduct(var.admin_users, local.admin_roles) :
+    jsonencode(pair) => { email = pair[0], role = pair[1] }
+  }
+}
+
+resource "google_organization_iam_member" "admins" {
+  for_each = local.admin_bindings
+
+  org_id = var.org_id
+  role   = each.value.role
+  member = "user:${each.value.email}"
+
+  lifecycle {
+    precondition {
+      condition     = can(regex("^[0-9]+$", var.org_id))
+      error_message = "Set org_id to a numeric organization ID when admin_users is nonempty."
+    }
+  }
 }
 
 module "workshop" {
