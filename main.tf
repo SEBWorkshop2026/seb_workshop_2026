@@ -7,6 +7,7 @@ locals {
 
   admin_roles = toset([
     "roles/iam.workforcePoolAdmin",
+    "roles/owner",
     "roles/resourcemanager.organizationAdmin",
     "roles/resourcemanager.projectCreator",
     "roles/resourcemanager.projectMover",
@@ -59,6 +60,7 @@ module "shared" {
   folder_id          = var.folder_id
   billing_account_id = var.billing_account_id
   apis               = local.enabled_apis
+  csv_bucket_name    = var.shared_csv_bucket_name
   budget_amount      = var.budget_amount
   budget_currency    = var.budget_currency
   budget_thresholds  = var.budget_alert_thresholds
@@ -75,4 +77,15 @@ resource "google_project_iam_member" "shared_bigquery_viewers" {
   project = module.shared.project_id
   role    = "roles/bigquery.dataViewer"
   member  = each.value
+}
+
+resource "google_storage_bucket_iam_member" "shared_csv_viewers" {
+  for_each = merge(
+    { for member in toset([for viewer in local.shared_viewers : can(regex("^(user|group|serviceAccount):", viewer)) ? viewer : "user:${viewer}"]) : "viewer:${member}" => member },
+    { for number, project in module.workshop : "project:${number}" => "serviceAccount:${project.dataform_service_account_email}" }
+  )
+
+  bucket = module.shared.csv_bucket_name
+  role   = "roles/storage.objectViewer"
+  member = each.value
 }

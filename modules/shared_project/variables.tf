@@ -10,6 +10,10 @@ variable "folder_id" {
 }
 variable "billing_account_id" { type = string }
 variable "apis" { type = list(string) }
+variable "csv_bucket_name" {
+  type    = string
+  default = null
+}
 variable "budget_amount" { type = number }
 variable "budget_currency" { type = string }
 variable "budget_thresholds" { type = list(number) }

@@ -39,6 +39,12 @@ variable "name_prefix" {
   default     = "ws2026"
 }
 
+variable "shared_csv_bucket_name" {
+  description = "Optional globally unique name for the shared CSV bucket. Defaults to the shared project ID with a -csv suffix."
+  type        = string
+  default     = null
+}
+
 variable "project_count" {
   type    = number
   default = 20

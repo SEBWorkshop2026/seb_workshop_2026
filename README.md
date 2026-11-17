@@ -44,7 +44,7 @@ GCP budgets send alerts; they do not stop spending.
 
 ## Organization administrators
 
-To grant the five organization-level administrator roles to individual Google
+To grant the six organization-level administrator roles to individual Google
 accounts, set the numeric organization ID and bare user email addresses in
 `terraform.tfvars`:
 
@@ -59,21 +59,21 @@ admin_users = [
 `admin_users` defaults to empty. Set `org_id` even if `folder_id` is set;
 projects will still be created in the folder. Apply the configuration using an
 account that can manage the organization's IAM policy. Terraform grants each
-user IAM Workforce Pool Admin, Organization Administrator, Project Creator,
-Project Mover, and Service Usage Admin. These organization-wide grants affect
-the whole organization, not just workshop projects. Removing a user from the
-list or destroying this configuration removes the grants managed by Terraform.
+user IAM Workforce Pool Admin, Owner, Organization Administrator, Project
+Creator, Project Mover, and Service Usage Admin. Owner is a broad role inherited
+by descendant resources, including projects; these grants affect the whole
+organization, not just workshop projects. Removing a user from the list or
+destroying this configuration removes the grants managed by Terraform.
 Review the plan before applying, especially if a role is already granted
 outside Terraform: import existing grants rather than managing the same grant
 in multiple places.
 
-These roles alone do **not** give direct access to every project, the state
-bucket, or the billing account, and do not by themselves provide all permissions
-needed to run this configuration. Provision the necessary project, storage,
-and billing permissions separately. Organization Administrator can change
-organization IAM, so these users can potentially grant themselves broader
-access. The bootstrap admin project must be under the organization for
-organization-level permissions to apply to it.
+These roles do not automatically grant access to billing accounts or to
+resources outside the organization. Provision any additional storage and
+billing permissions separately. Organization Administrator and Owner provide
+broad administrative access, including the ability to change IAM. The bootstrap
+admin project must be under the organization for organization-level permissions
+to apply to it.
 
 ## Sync Terraform variables
 
@@ -119,16 +119,21 @@ BigQuery usage can incur charges, and budgets do not enforce a spending limit.
 ## Load synthetic banking data
 
 After applying Terraform, authenticate application default credentials with
-`gcloud auth application-default login`. Use an existing Cloud Storage bucket
-that participants can read; it is not created by this generator. An
-administrator needs BigQuery dataset creation, table creation/update and job
-creation permissions, as well as permission to read the bucket metadata and
-create or replace its objects.
+`gcloud auth application-default login`. Terraform creates a private EU bucket
+named `<shared-project-id>-csv` for the CSV source data. Its name must be
+globally available; set `shared_csv_bucket_name` to a different globally unique
+name if it is already taken. Storage API is enabled in the shared project even
+when omitted from `enabled_apis`. Assigned participants, extra shared viewers,
+and workshop Dataform service accounts have object viewer access. The Terraform
+operator needs permission to create the bucket and manage its IAM policy. An
+administrator loading data needs BigQuery dataset creation, table creation/update
+and job creation permissions, as well as permission to read the bucket metadata
+and create or replace its objects.
 
 ```sh
 uv run --project sample_data sample-data \
   --project "$(terraform output -raw shared_project)" \
-  --bucket YOUR_SAMPLE_DATA_BUCKET
+  --bucket "$(terraform output -raw shared_csv_bucket)"
 ```
 
 The generator replaces three monthly-partitioned BigQuery tables and writes
@@ -141,3 +146,8 @@ prefix; unrelated tables and objects, including legacy tables from earlier
 versions of the generator, are not removed. A failed run may leave mixed
 generations; rerun it to complete the load. BigQuery and Cloud Storage may
 incur charges.
+
+The bucket has uniform bucket-level access and public access prevention
+enabled. Terraform will not destroy it while it contains objects; remove or
+relocate the objects deliberately before destroying or renaming the bucket.
+Object access grants do not include permission to upload or replace CSVs.

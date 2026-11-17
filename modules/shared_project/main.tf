@@ -17,10 +17,20 @@ resource "google_project" "this" {
 }
 
 resource "google_project_service" "apis" {
-  for_each           = toset(var.apis)
+  for_each           = setunion(toset(var.apis), toset(["storage.googleapis.com"]))
   project            = google_project.this.project_id
   service            = each.value
   disable_on_destroy = false
+}
+
+resource "google_storage_bucket" "csv" {
+  project                     = google_project.this.project_id
+  name                        = var.csv_bucket_name != null ? var.csv_bucket_name : "${google_project.this.project_id}-csv"
+  location                    = "EU"
+  uniform_bucket_level_access = true
+  public_access_prevention    = "enforced"
+
+  depends_on = [google_project_service.apis]
 }
 
 resource "google_project_iam_member" "members" {
