@@ -1,7 +1,7 @@
-dataformCoreVersion: "3.0.0"
+dataformCoreVersion: "3.0.52"
 defaultProject: ws2026-01
 defaultDataset: bronze
 defaultLocation: EU
 vars:
-  reporting_period: ""
+  reporting_period: "2025-03"
   csv_bucket: ws2026-shared-csv

@@ -11,10 +11,34 @@ monthly by `reporting_date`.
 1. Apply the workshop Terraform configuration, including the bucket permissions.
    Load the sample data into `ws2026-shared.banking_sample` and the shared CSV
    bucket using the generator.
-2. Create a Dataform repository in the participant project and put the contents
-   of this directory at the root of that repository. Dataform requires
-   `workflow_settings.yaml` at the repository root; connecting this workshop
-   repository unchanged leaves the file in a subdirectory.
+2. Create a Dataform repository and workspace in the participant project. To
+   upload this directory to the workspace linked in the workshop, run from
+   the workshop repository:
+
+   ```sh
+   gcloud auth login
+   python3 scripts/upload_dataform.py
+   ```
+
+   The defaults are project `ws2026-01`, location `europe-west1`, repository
+   `first_repo`, and workspace `dev_workspace_1`. Override these with
+   `--project`, `--location`, `--repository`, or `--workspace`. The script
+   uses `gcloud` credentials to call the Dataform API, because `gcloud` has no
+   Dataform workspace file command. It refuses to overwrite differing files
+   unless `--overwrite` is supplied. Review workspace changes before using it:
+
+   ```sh
+   python3 scripts/upload_dataform.py --overwrite
+   ```
+
+   Hidden files and `node_modules` are not uploaded. Other workspace files are
+   not deleted; the script lists extra SQLX and JavaScript files under
+   `definitions` and `includes` because they may affect compilation. Uploads
+   are not atomic; rerun after fixing an error. The script writes uncommitted
+   workspace files, not a Git commit or push. Commit and push separately in
+   Dataform if needed. Dataform requires `workflow_settings.yaml` at the
+   repository root; connecting this workshop repository unchanged leaves the
+   file in a subdirectory.
 3. Configure the repository to run using that project's `dataform-workflows`
    service account. The account needs permission to create datasets and tables
    in the participant project, run BigQuery jobs, read the shared tables, and
@@ -27,10 +51,10 @@ monthly by `reporting_date`.
 
 ## Run a reporting period
 
-Supply `reporting_period` as a compilation variable for every run, in `YYYY-MM`
-format, such as `2025-03`. The blank default prevents an accidental run without
-a period. The pipeline uses the first day of that month to select both the
-shared BigQuery rows and the CSV filename, for example
+Set `reporting_period` as a compilation variable in `YYYY-MM` format. It
+defaults to `2025-03`, so a workspace run without an override will process that
+month. The pipeline uses the first day of the month to select both the shared
+BigQuery rows and the CSV filename, for example
 `banking_sample/debtor_financial/2025-03-01.csv`.
 
 For a programmatic run, call the

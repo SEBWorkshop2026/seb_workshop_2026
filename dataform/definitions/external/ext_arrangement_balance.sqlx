@@ -2,7 +2,7 @@ config {
   type: "operations",
   schema: "external",
   hasOutput: true,
-  dependencies: [{ schema: "bronze", name: "create_datasets" }]
+  dependencies: ["create_datasets"]
 }
 
 CREATE OR REPLACE EXTERNAL TABLE ${self()} (
