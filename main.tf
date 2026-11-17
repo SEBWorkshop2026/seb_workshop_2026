@@ -89,3 +89,11 @@ resource "google_storage_bucket_iam_member" "shared_csv_viewers" {
   role   = "roles/storage.objectViewer"
   member = each.value
 }
+
+resource "google_storage_bucket_iam_member" "dataform_csv_bucket_viewers" {
+  for_each = module.workshop
+
+  bucket = module.shared.csv_bucket_name
+  role   = "roles/storage.bucketViewer"
+  member = "serviceAccount:${each.value.dataform_service_account_email}"
+}

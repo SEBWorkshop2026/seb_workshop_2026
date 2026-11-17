@@ -1,0 +1,22 @@
+config {
+  type: "operations",
+  schema: "external",
+  hasOutput: true,
+  dependencies: [{ schema: "bronze", name: "create_datasets" }]
+}
+
+CREATE OR REPLACE EXTERNAL TABLE ${self()} (
+  reporting_date DATE,
+  collateral_id STRING,
+  loan_id STRING,
+  property_id STRING,
+  property_value NUMERIC,
+  currency STRING,
+  collateral_type STRING,
+  loan_to_value_ratio NUMERIC
+)
+OPTIONS (
+  format = 'CSV',
+  skip_leading_rows = 1,
+  uris = ['gs://${csvBucket()}/banking_sample/collateral/*.csv']
+);

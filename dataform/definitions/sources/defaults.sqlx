@@ -1,0 +1,6 @@
+config {
+  type: "declaration",
+  database: "ws2026-shared",
+  schema: "banking_sample",
+  name: "defaults"
+}

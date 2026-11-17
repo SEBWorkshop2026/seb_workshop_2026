@@ -1,0 +1,16 @@
+config {
+  type: "incremental",
+  dependencies: ["create_datasets"],
+  bigquery: {
+    partitionBy: "DATE_TRUNC(reporting_date, MONTH)"
+  }
+}
+
+pre_operations {
+  ${when(incremental(), `DELETE FROM ${self()} WHERE reporting_date = DATE '${reportingDate()}'`)}
+}
+
+SELECT e.*, CURRENT_TIMESTAMP() AS _ingested_at, _FILE_NAME AS _source_file
+FROM ${ref("external", "ext_collateral")} e
+WHERE _FILE_NAME = 'gs://${csvBucket()}/banking_sample/collateral/${reportingDate()}.csv'
+  AND e.reporting_date = DATE '${reportingDate()}'

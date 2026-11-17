@@ -1,0 +1,23 @@
+config {
+  type: "operations",
+  schema: "external",
+  hasOutput: true,
+  dependencies: [{ schema: "bronze", name: "create_datasets" }]
+}
+
+CREATE OR REPLACE EXTERNAL TABLE ${self()} (
+  reporting_date DATE,
+  debtor_identifier STRING,
+  income NUMERIC,
+  funds_available NUMERIC,
+  currency STRING,
+  credit_rating INT64,
+  household_income NUMERIC,
+  employment_industry STRING,
+  proposed_risk_class INT64
+)
+OPTIONS (
+  format = 'CSV',
+  skip_leading_rows = 1,
+  uris = ['gs://${csvBucket()}/banking_sample/debtor_financial/*.csv']
+);
