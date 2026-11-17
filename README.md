@@ -119,36 +119,25 @@ BigQuery usage can incur charges, and budgets do not enforce a spending limit.
 ## Load synthetic banking data
 
 After applying Terraform, authenticate application default credentials with
-`gcloud auth application-default login`.
-An administrator with BigQuery dataset creation, table creation/update, and job
-creation permissions in the shared project can run:
+`gcloud auth application-default login`. Use an existing Cloud Storage bucket
+that participants can read; it is not created by this generator. An
+administrator needs BigQuery dataset creation, table creation/update and job
+creation permissions, as well as permission to read the bucket metadata and
+create or replace its objects.
 
 ```sh
-uv run --project sample_data sample-data --project "$(terraform output -raw shared_project)"
+uv run --project sample_data sample-data \
+  --project "$(terraform output -raw shared_project)" \
+  --bucket YOUR_SAMPLE_DATA_BUCKET
 ```
 
-By default this creates the `banking_sample` dataset in the `EU` location and
-generates 10,000 arrangements, using a fixed seed and snapshot date
-(`2026-01-01`). Use `--dataset`, `--location`, `--count`, and `--seed` to
-override those defaults. If the dataset already exists, its location must
-match `--location`. BigQuery queries that join these tables with participant
-data must use the same location.
+The generator replaces three monthly-partitioned BigQuery tables and writes
+monthly CSV files for three source systems to the bucket. It uses 10,000 synthetic Lithuanian
+mortgages and a fixed seed by default. See [sample_data/README.md](sample_data/README.md)
+for the source schemas, dates, risk assumptions, and limitations.
 
-**Each run replaces the seven sample tables**; other tables are untouched.
-Loads happen one table at a time, so a failed run can leave a mixture of old
-and new tables. Re-run the command to finish. BigQuery jobs and storage may
-incur charges. All records are synthetic and use EUR:
-
-| Table | Contents |
-| --- | --- |
-| `debtors` | Debtor ID, annual income, monthly money at disposal, and employment status |
-| `arrangements` | Arrangement and debtor IDs, origination and maturity dates, and status |
-| `balance_sheet` | Two rows per arrangement: principal and accrued interest at the snapshot date |
-| `properties` | Property ID and value |
-| `deeds` | Deed ID and its property ID |
-| `collaterals` | Arrangement-to-deed links, property ID, and encumbrance |
-| `defaults` | Defaulted arrangement ID and default date |
-
-Join arrangements to debtors on `debtor_id`, to balances and defaults on
-`ar_id`, and to properties through `collaterals` and `deeds`. Multiple
-arrangements can share a deed, and an arrangement can have multiple deeds.
+Each run replaces those three tables and the 75 CSV objects under the selected
+prefix; unrelated tables and objects, including legacy tables from earlier
+versions of the generator, are not removed. A failed run may leave mixed
+generations; rerun it to complete the load. BigQuery and Cloud Storage may
+incur charges.
