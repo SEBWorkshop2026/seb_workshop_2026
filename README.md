@@ -116,9 +116,9 @@ These roles allow participants to create BigQuery jobs and modify data in their
 own projects, and to run Dataform workflows using the execution account.
 BigQuery usage can incur charges, and budgets do not enforce a spending limit.
 
-The [bronze Dataform project](dataform/README.md) loads one chosen reporting
-date from the shared BigQuery and CSV sources into partitioned tables in a
-participant project.
+The [Dataform project](dataform/README.md) loads one chosen reporting date from
+the shared BigQuery and CSV sources into bronze tables, then builds silver
+dimensions and facts from the loaded snapshots in a participant project.
 
 ## Load synthetic banking data
 

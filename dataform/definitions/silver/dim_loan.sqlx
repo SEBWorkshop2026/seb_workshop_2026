@@ -1,0 +1,24 @@
+config {
+  type: "incremental",
+  schema: "silver",
+  dependencies: ["create_datasets"],
+  bigquery: {
+    partitionBy: "DATE_TRUNC(reporting_date, MONTH)"
+  }
+}
+
+pre_operations {
+  ${when(incremental(), `DELETE FROM ${self()} WHERE reporting_date = DATE '${reportingDate()}'`)}
+}
+
+SELECT
+  loan_id,
+  reporting_date,
+  type_of_loan,
+  reason_for_loan,
+  initial_credit_limit,
+  currency,
+  PARSE_DATE('%Y%m%d', CAST(origination_date AS STRING)) AS origination_date,
+  PARSE_DATE('%Y%m%d', CAST(maturity_date AS STRING)) AS maturity_date
+FROM ${ref("bronze", "arrangement_account_info")}
+WHERE reporting_date = DATE '${reportingDate()}'

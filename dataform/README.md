@@ -1,10 +1,38 @@
-# Bronze Dataform pipeline
+# Bronze and silver Dataform pipeline
 
 This project reads the three shared BigQuery source tables and the three CSV
 sources into six native BigQuery tables in a participant project's `bronze`
 dataset. CSV external tables are created in the participant project's
-`external` dataset. Both datasets are in `EU`; bronze tables are partitioned
+`external` dataset. The silver models are created in the participant project's
+`silver` dataset. All three datasets are in `EU`; bronze tables are partitioned
 monthly by `reporting_date`.
+
+## Silver models
+
+Silver models retain a snapshot for each loaded reporting period. Each run
+replaces only the selected period, including when periods are loaded out of
+order. Load each desired reporting period separately.
+
+| Model | Grain and behavior |
+| --- | --- |
+| `dim_debtor` | One row per debtor and reporting date, joining debtor info and financial snapshots by debtor and date. Missing financial data remains null. |
+| `dim_loan` | One row per loan and reporting date; origination and maturity are converted to `DATE`. |
+| `bridge_loan_debtor` | Primary and non-null co-debtor relationships per loan and reporting date, with roles `primary` and `co`. |
+| `fct_loan_balance` | One row per loan and reporting date, including balances, payment, annual percentage rate, status, and invoice due date. |
+| `fct_collateral` | One row per collateral, loan, and reporting date, including property value and the source LTV ratio. |
+| `fct_default` | One row per loan, default date, and reporting date, incrementally replacing the selected cumulative snapshot. |
+
+Join dimensions, the bridge, and facts on `reporting_date` as well as their
+entity keys to use matching snapshots. The models assume the source grains
+described in the [sample data documentation](../sample_data/README.md); repeated
+source keys can produce duplicate silver rows within a period. Currency remains
+a column on monetary models, not a separate dimension. All silver tables are
+monthly-partitioned by reporting date. Date attributes can be derived directly
+from the date columns in BigQuery.
+The default fact deduplicates within each reporting snapshot. Since snapshots
+are cumulative, a default appears in multiple periods: filter on
+`reporting_date` or deduplicate by loan and default date when counting events.
+Rerunning a period replaces that snapshot without changing other periods.
 
 ## Setup
 
@@ -92,21 +120,33 @@ configuration can also set compilation variables.
 
 ## Reruns and limitations
 
-Each incremental model creates its table on the first run. On later runs, its
-pre-operation deletes the selected reporting date, then Dataform inserts the
-rows for that date. Each row has an `_ingested_at` timestamp; CSV rows also
-have a `_source_file`. The external tables use the existing CSV paths, not Hive
-partitions.
+Each bronze and silver incremental model creates its table on the first run. On
+later runs, its pre-operation deletes the selected reporting date, then Dataform
+inserts the rows for that date. Bronze rows have an `_ingested_at`
+timestamp; bronze CSV rows also have a `_source_file`. The external tables use
+the existing CSV paths, not Hive partitions.
 
 The delete and insert are separate operations, not a transaction. If a source
 is missing or empty, or insertion fails after the delete, existing rows for the
 selected period can be lost. Other models may already have completed; fix the
 issue and rerun the period. Run one invocation at a time.
 
-A Dataform full refresh recreates each table using only the selected period and
-removes other periods. If tables were created by the earlier custom-operation
-pipeline, add nullable `_ingested_at` TIMESTAMP columns to all six tables and
-nullable `_source_file` STRING columns to the three CSV tables before running
-these models. A full refresh also changes the schema, but discards other periods.
+A Dataform full refresh recreates each bronze and silver table using only the
+selected period and removes other periods. If bronze tables were created by the
+earlier custom-operation pipeline, add nullable `_ingested_at` TIMESTAMP
+columns to all six tables and nullable `_source_file` STRING columns to the
+three CSV tables before running these models. A full refresh also changes the
+schema, but discards other periods.
 The generator overwrites CSVs, so this pipeline retains the latest loaded
 version of each reporting date, not an immutable history of deliveries.
+If `silver.dim_debtor`, `silver.dim_loan`, or `silver.bridge_loan_debtor`
+already exists from the earlier unpartitioned models, back up any data you
+need, then drop those tables before running the new models. The same applies to
+`silver.fct_default` if it exists from the earlier event-grain model partitioned
+by default date. BigQuery cannot replace a table with a different partitioning
+specification. Rerun each desired reporting period to populate snapshots.
+
+The date dimension is no longer defined. Uploading does not delete old
+workspace files, so remove an existing `definitions/silver/dim_date.sqlx`
+from the Dataform workspace separately. Removing its definition does not delete
+an existing BigQuery table.
