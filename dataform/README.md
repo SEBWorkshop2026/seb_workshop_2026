@@ -118,6 +118,63 @@ invocation's final state for success. For a different period, create a new
 compilation result with the new period and invoke it. A console release
 configuration can also set compilation variables.
 
+## Create historical releases
+
+Once the Dataform repository's remote `main` branch contains this project at
+its root, create a release for each sample snapshot (2024-01 through 2026-01,
+inclusive):
+
+```sh
+gcloud auth login
+python3 scripts/create_historical_releases.py \
+  --project YOUR_PARTICIPANT_PROJECT --csv-bucket YOUR_SHARED_CSV_BUCKET
+```
+
+Run this from the workshop repository. Defaults match the workspace upload
+script: project `ws2026-01`, location `europe-west1`, and repository
+`first_repo`; override them with `--project`, `--location`, and `--repository`.
+The default bucket is `ws2026-shared-csv`. The caller needs permission to
+create, read and update Dataform release configurations and create compilation
+results. The repository must be connected to a remote containing `main` and
+the desired changes must be committed and pushed there; workspace edits are
+not used.
+
+The script creates 25 unscheduled `historical-YYYY-MM` release configurations,
+compiles each from `main` with that reporting period and publishes its live
+compilation result. It does **not** run the releases or load data.
+Existing matching releases with live compilations are left unchanged; matching
+releases without one are compiled, so rerunning can resume after a failure.
+A conflicting configuration stops the script without modifying it. Earlier
+releases may already have been created when an error occurs. A subsequent run
+does not refresh existing live compilations after `main` changes; update them
+deliberately in Dataform if needed.
+
+## Run historical releases
+
+After creating the releases and loading the sample sources, run:
+
+```sh
+python3 scripts/run_historical_releases.py --project YOUR_PARTICIPANT_PROJECT
+```
+
+The script uses the same default project, location, and repository as the release
+creator; override them with `--project`, `--location`, and `--repository`. It
+checks each release's reporting-period setting and live compilation result
+reference, then executes all 25 periods chronologically, waiting for each
+invocation to succeed before starting the next. It uses the repository's
+configured execution account and does not request a full refresh. Ensure the
+live compilations correspond to their release settings; changing a release
+config does not automatically recompile it. The caller needs permission to read release configurations and
+create and read workflow invocations, and to use the execution service account.
+
+The runner stops on an error, failure, cancellation, or unexpected state.
+After investigating and ensuring no invocation is still running, use
+`--start-period YYYY-MM` to resume from the affected period. The script does not
+cancel a running invocation if interrupted, and a network error during invocation
+creation can leave an invocation running even if its name was not returned.
+Check Dataform before retrying. Do not run this script concurrently with any
+other invocation against the same tables. Executions can incur BigQuery charges.
+
 ## Reruns and limitations
 
 Each bronze and silver incremental model creates its table on the first run. On
