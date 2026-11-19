@@ -78,7 +78,7 @@ to apply to it.
 ## Sync Terraform variables
 
 After signing in with `gcloud auth login`, use the existing state bucket to
-transfer your ignored `terraform.tfvars` between laptops:
+transfer all root-level `*.tfvars` and `*.tfvars.json` files between laptops:
 
 ```sh
 ./scripts/tfvars.sh upload
@@ -86,11 +86,64 @@ transfer your ignored `terraform.tfvars` between laptops:
 ```
 
 Both commands default to the `ws2026-tfstate` bucket; pass a different bucket
-name as the second argument if needed. Download refuses to overwrite a local
-file: move it aside first if you want to replace it. Upload replaces the
-remote copy. Sync is manual, so download before editing and upload after
-changes. Anyone with sufficient bucket access can read both the variables and
-the Terraform state; restrict that access accordingly.
+name as the second argument if needed. Download overwrites matching local
+files; upload replaces matching remote files but does not delete files that
+no longer exist locally. Downloads and uploads can partially complete if a transfer
+fails. Download requires permission to list objects in the bucket. Sync is
+manual, so download before editing and upload after changes.
+Check that your variable files are ignored by Git. Anyone with sufficient
+bucket access can read both the variables and the Terraform state; restrict
+that access accordingly.
+
+## Assign Classroom students to projects
+
+Put a Google OAuth access token in the local `credential.json` file:
+
+```json
+{"access_token": "YOUR_ACCESS_TOKEN"}
+```
+
+Authorize as a teacher of the active class with these scopes:
+
+```text
+https://www.googleapis.com/auth/classroom.courses.readonly
+https://www.googleapis.com/auth/classroom.rosters.readonly
+https://www.googleapis.com/auth/classroom.profile.emails
+```
+
+You can obtain a token with [Google's OAuth Playground](https://developers.google.com/oauthplayground/).
+The token expires and cannot be refreshed by this script; replace it when
+needed. Access to the Classroom API and roster must be allowed for the
+authorized account. `credential.json` is ignored by Git and should be kept
+private. Use `--credentials` to select a different JSON file.
+
+Run the script with `uv` from the repository root. `uv` installs its declared
+dependencies automatically:
+
+```sh
+uv run scripts/assign_classroom_projects.py \
+  --class-name "YOUR CLASS NAME"
+terraform plan
+terraform apply
+```
+
+The script sorts emails and assigns one student to each project starting at 1.
+It fails if the roster is empty, emails are missing or duplicated, or multiple
+active classes have that name. Each successful run replaces
+`classroom-assignments.auto.tfvars.json`; use `--output` to select a different
+file. Set Terraform's `project_count` to at least the number of students;
+Terraform rejects assignments beyond that count.
+
+The JSON variable file replaces the entire `assignments` map from
+`terraform.tfvars`, not just individual entries. Review the generated file
+and Terraform plan before applying: adding or removing students can change
+project assignments and revoke access. Terraform automatically loads the
+default file from the repository root; custom outputs outside that directory
+or without the `.auto.tfvars.json` suffix must be supplied with `-var-file`.
+Other variable files or command-line arguments can override the assignments.
+The generated default file is ignored by Git; protect it, any custom output
+paths, and your credentials, and transfer the assignment file securely between
+operators.
 
 ## BigQuery and Dataform
 

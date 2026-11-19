@@ -2,5 +2,7 @@
 *.tfstate*
 terraform.tfvars
 *.auto.tfvars
+*.auto.tfvars.json
+credential.json
 .venv/
 __pycache__/
