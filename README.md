@@ -169,6 +169,12 @@ These roles allow participants to create BigQuery jobs and modify data in their
 own projects, and to run Dataform workflows using the execution account.
 BigQuery usage can incur charges, and budgets do not enforce a spending limit.
 
+Each participant project also gets a custom-mode VPC named `default` with one
+subnet (`10.0.0.0/24`, Private Google Access on) in `notebook_region`
+(default `europe-central2`). BigQuery Studio Python notebooks run on Colab
+Enterprise, whose default runtime uses this network. 
+A `Workshop` runtime template in the same region pins the network and subnetwork.
+
 The [Dataform project](dataform/README.md) loads one chosen reporting date from
 the shared BigQuery and CSV sources into bronze tables, then builds silver
 dimensions and facts and a gold loan snapshot in a participant project.

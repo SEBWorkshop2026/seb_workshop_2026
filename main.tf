@@ -44,6 +44,7 @@ module "workshop" {
   folder_id          = var.folder_id
   billing_account_id = var.billing_account_id
   apis               = local.enabled_apis
+  notebook_region    = var.notebook_region
   budget_amount      = var.budget_amount
   budget_currency    = var.budget_currency
   budget_thresholds  = var.budget_alert_thresholds

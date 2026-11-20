@@ -77,6 +77,12 @@ variable "enabled_apis" {
   ]
 }
 
+variable "notebook_region" {
+  description = "Region of the subnet in each workshop project's \"default\" VPC, used by BigQuery Studio (Colab Enterprise) notebook runtimes."
+  type        = string
+  default     = "europe-central2"
+}
+
 variable "participant_role" {
   description = "Role granted to a participant on their own project."
   type        = string
