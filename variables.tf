@@ -72,7 +72,8 @@ variable "enabled_apis" {
   default = [
     "compute.googleapis.com",
     "storage.googleapis.com",
-    "run.googleapis.com"
+    "run.googleapis.com",
+    "aiplatform.googleapis.com"
   ]
 }
 
