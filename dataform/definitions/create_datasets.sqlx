@@ -10,3 +10,6 @@ OPTIONS (location = 'EU');
 
 CREATE SCHEMA IF NOT EXISTS `${dataform.projectConfig.defaultDatabase}.silver`
 OPTIONS (location = 'EU');
+
+CREATE SCHEMA IF NOT EXISTS `${dataform.projectConfig.defaultDatabase}.gold`
+OPTIONS (location = 'EU');

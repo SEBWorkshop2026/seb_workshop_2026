@@ -1,10 +1,10 @@
-# Bronze and silver Dataform pipeline
+# Bronze, silver and gold Dataform pipeline
 
 This project reads the three shared BigQuery source tables and the three CSV
 sources into six native BigQuery tables in a participant project's `bronze`
 dataset. CSV external tables are created in the participant project's
-`external` dataset. The silver models are created in the participant project's
-`silver` dataset. All three datasets are in `EU`; bronze tables are partitioned
+`external` dataset. The silver and gold models are created in the participant project's
+`silver` and `gold` datasets. All four datasets are in `EU`; bronze tables are partitioned
 monthly by `reporting_date`.
 
 ## Silver models
@@ -33,6 +33,23 @@ The default fact deduplicates within each reporting snapshot. Since snapshots
 are cumulative, a default appears in multiple periods: filter on
 `reporting_date` or deduplicate by loan and default date when counting events.
 Rerunning a period replaces that snapshot without changing other periods.
+
+## Gold model
+
+`gold.loan_obt` is a monthly-partitioned, incremental one-big-table loan
+snapshot, with one row per loan and reporting date. Dataform assertions check
+that both keys are non-null and that their combination is unique across the
+table. Duplicate matching rows in silver can therefore fail the assertions
+rather than silently multiplying loans.
+
+The model starts from `dim_loan` and left joins the matching balance, primary
+debtor, co-debtor, collateral, and default snapshots. Debtor and co-debtor
+attributes have separate prefixed columns; missing related records have null
+fields. The model assumes at most one matching record for each relationship
+per loan and reporting date. Loan and balance amounts use the loan currency;
+debtor and collateral currencies remain alongside their attributes. Default
+dates are cumulative across snapshots, so filter by reporting date or
+deduplicate events across snapshots when counting defaults.
 
 ## Setup
 
@@ -142,12 +159,11 @@ not used.
 The script creates 25 unscheduled `historical-YYYY-MM` release configurations,
 compiles each from `main` with that reporting period and publishes its live
 compilation result. It does **not** run the releases or load data.
-Existing matching releases with live compilations are left unchanged; matching
-releases without one are compiled, so rerunning can resume after a failure.
-A conflicting configuration stops the script without modifying it. Earlier
-releases may already have been created when an error occurs. A subsequent run
-does not refresh existing live compilations after `main` changes; update them
-deliberately in Dataform if needed.
+Every run recompiles matching releases from the current remote `main` and
+replaces their live compilation results. A conflicting configuration stops the
+script without modifying it. Releases are updated sequentially; if an error
+occurs, earlier releases may already point to new results. The script does not
+run the releases; run them separately to reload the historical data.
 
 ## Run historical releases
 
@@ -177,7 +193,7 @@ other invocation against the same tables. Executions can incur BigQuery charges.
 
 ## Reruns and limitations
 
-Each bronze and silver incremental model creates its table on the first run. On
+Each bronze, silver and gold incremental model creates its table on the first run. On
 later runs, its pre-operation deletes the selected reporting date, then Dataform
 inserts the rows for that date. Bronze rows have an `_ingested_at`
 timestamp; bronze CSV rows also have a `_source_file`. The external tables use
@@ -188,7 +204,7 @@ is missing or empty, or insertion fails after the delete, existing rows for the
 selected period can be lost. Other models may already have completed; fix the
 issue and rerun the period. Run one invocation at a time.
 
-A Dataform full refresh recreates each bronze and silver table using only the
+A Dataform full refresh recreates each bronze, silver and gold table using only the
 selected period and removes other periods. If bronze tables were created by the
 earlier custom-operation pipeline, add nullable `_ingested_at` TIMESTAMP
 columns to all six tables and nullable `_source_file` STRING columns to the

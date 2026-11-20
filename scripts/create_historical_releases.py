@@ -67,10 +67,6 @@ def create_releases(project, location, repository, csv_bucket, token):
         ):
             raise ValueError(f"{release_name} differs from the requested unscheduled configuration; not modifying it")
 
-        if release.get("releaseCompilationResult"):
-            print(f"{period}: already released; left unchanged")
-            continue
-
         result = request(
             "POST", f"{parent}/compilationResults", token,
             body={"releaseConfig": release_name},

@@ -1,0 +1,95 @@
+config {
+  type: "incremental",
+  schema: "gold",
+  dependencies: ["create_datasets"],
+  assertions: {
+    nonNull: ["loan_id", "reporting_date"],
+    uniqueKey: ["loan_id", "reporting_date"]
+  },
+  bigquery: {
+    partitionBy: "DATE_TRUNC(reporting_date, MONTH)"
+  }
+}
+
+pre_operations {
+  ${when(incremental(), `DELETE FROM ${self()} WHERE reporting_date = DATE '${reportingDate()}'`)}
+}
+
+SELECT
+  l.loan_id,
+  l.reporting_date,
+  l.type_of_loan,
+  l.reason_for_loan,
+  l.initial_credit_limit,
+  l.currency,
+  l.origination_date,
+  l.maturity_date,
+  b.loan_status,
+  b.original_principal_balance,
+  b.current_principal_balance,
+  b.next_payment_due,
+  b.interest_rate,
+  b.interest_type,
+  b.inv_due_date,
+  primary_bridge.debtor_id,
+  d.age AS debtor_age,
+  d.sex AS debtor_sex,
+  d.education AS debtor_education,
+  d.politically_exposed AS debtor_politically_exposed,
+  d.underage_children_count AS debtor_underage_children_count,
+  d.family_status AS debtor_family_status,
+  d.residence_region AS debtor_residence_region,
+  d.income AS debtor_income,
+  d.funds_available AS debtor_funds_available,
+  d.currency AS debtor_currency,
+  d.credit_rating AS debtor_credit_rating,
+  d.household_income AS debtor_household_income,
+  d.employment_industry AS debtor_employment_industry,
+  d.proposed_risk_class AS debtor_proposed_risk_class,
+  co_bridge.debtor_id AS co_debtor_id,
+  cd.age AS co_debtor_age,
+  cd.sex AS co_debtor_sex,
+  cd.education AS co_debtor_education,
+  cd.politically_exposed AS co_debtor_politically_exposed,
+  cd.underage_children_count AS co_debtor_underage_children_count,
+  cd.family_status AS co_debtor_family_status,
+  cd.residence_region AS co_debtor_residence_region,
+  cd.income AS co_debtor_income,
+  cd.funds_available AS co_debtor_funds_available,
+  cd.currency AS co_debtor_currency,
+  cd.credit_rating AS co_debtor_credit_rating,
+  cd.household_income AS co_debtor_household_income,
+  cd.employment_industry AS co_debtor_employment_industry,
+  cd.proposed_risk_class AS co_debtor_proposed_risk_class,
+  c.collateral_id,
+  c.property_id,
+  c.property_value,
+  c.currency AS collateral_currency,
+  c.collateral_type,
+  c.loan_to_value_ratio,
+  f.default_date
+FROM ${ref("silver", "dim_loan")} l
+LEFT JOIN ${ref("silver", "fct_loan_balance")} b
+  ON l.loan_id = b.loan_id
+  AND l.reporting_date = b.reporting_date
+LEFT JOIN ${ref("silver", "bridge_loan_debtor")} primary_bridge
+  ON l.loan_id = primary_bridge.loan_id
+  AND l.reporting_date = primary_bridge.reporting_date
+  AND primary_bridge.role = 'primary'
+LEFT JOIN ${ref("silver", "dim_debtor")} d
+  ON primary_bridge.debtor_id = d.debtor_id
+  AND primary_bridge.reporting_date = d.reporting_date
+LEFT JOIN ${ref("silver", "bridge_loan_debtor")} co_bridge
+  ON l.loan_id = co_bridge.loan_id
+  AND l.reporting_date = co_bridge.reporting_date
+  AND co_bridge.role = 'co'
+LEFT JOIN ${ref("silver", "dim_debtor")} cd
+  ON co_bridge.debtor_id = cd.debtor_id
+  AND co_bridge.reporting_date = cd.reporting_date
+LEFT JOIN ${ref("silver", "fct_collateral")} c
+  ON l.loan_id = c.loan_id
+  AND l.reporting_date = c.reporting_date
+LEFT JOIN ${ref("silver", "fct_default")} f
+  ON l.loan_id = f.loan_id
+  AND l.reporting_date = f.reporting_date
+WHERE l.reporting_date = DATE '${reportingDate()}'
