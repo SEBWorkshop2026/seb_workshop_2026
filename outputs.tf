@@ -1,5 +1,5 @@
 output "projects" {
-  value = { for k, m in module.workshop : k => m.project_id }
+  value = merge({ for k, m in module.workshop : k => m.project_id }, { "2" = module.participant_project.project_id })
 }
 
 output "shared_project" {
@@ -11,7 +11,7 @@ output "shared_csv_bucket" {
   value       = module.shared.csv_bucket_name
 }
 
-output "dataform_service_accounts" {
-  description = "Select the corresponding account when creating a Dataform repository."
-  value       = { for k, m in module.workshop : k => m.dataform_service_account_email }
+output "participant_repositories" {
+  description = "Dataform repository IDs by virtual participant slot in workshop project 02."
+  value       = { for slot, repository in google_dataform_repository.participant : slot => repository.name }
 }

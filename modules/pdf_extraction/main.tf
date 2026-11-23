@@ -3,8 +3,7 @@
 # Shared project: one private EU bucket with the credit memo PDFs and the label file.
 # Each participant project: BigQuery Connection and Agent Platform (Vertex AI) APIs, a credit memo
 # dataset, a Cloud resource connection in EU whose service account reads the bucket and calls Gemini,
-# and permission for the participants and the project's Dataform execution account to use that
-# connection.
+# and permission for the participants to use that connection.
 
 terraform {
   required_providers {
@@ -23,15 +22,12 @@ locals {
     ])
   }
 
-  # every assigned participant, their Dataform account and extra viewers can browse the archive.
-  # Static keys: Dataform account emails are unknown until the accounts exist (first apply).
-  bucket_viewers = merge(
-    { for m in toset(concat(
+  bucket_viewers = {
+    for m in toset(concat(
       flatten([for number, members in local.participant_members : tolist(members)]),
       [for m in var.extra_viewers : can(regex("^(user|group|serviceAccount):", m)) ? m : "user:${m}"],
-    )) : "viewer:${m}" => m },
-    { for number, p in var.participant_projects : "dataform:${number}" => "serviceAccount:${p.dataform_service_account}" },
-  )
+    )) : "viewer:${m}" => m
+  }
 
   project_apis = {
     for pair in setproduct(keys(var.participant_projects), ["bigqueryconnection.googleapis.com", "aiplatform.googleapis.com"]) :
@@ -39,10 +35,8 @@ locals {
   }
 
   connection_users = merge([
-    for number, p in var.participant_projects : merge(
-      { for m in local.participant_members[number] : "${number}/${m}" => { number = number, member = m } },
-      { "${number}/dataform" = { number = number, member = "serviceAccount:${p.dataform_service_account}" } },
-    )
+    for number, p in var.participant_projects :
+    { for m in local.participant_members[number] : "${number}/${m}" => { number = number, member = m } }
   ]...)
 
   memo_files = var.memo_source_dir == null ? toset([]) : fileset("${var.memo_source_dir}/pdf", "*.pdf")
@@ -135,7 +129,7 @@ resource "google_project_iam_member" "connection_aiplatform" {
   member  = "serviceAccount:${each.value.cloud_resource[0].service_account_id}"
 }
 
-# participants and the project's Dataform execution account may use the connection
+# participants may use the connection
 resource "google_bigquery_connection_iam_member" "users" {
   for_each = local.connection_users
 

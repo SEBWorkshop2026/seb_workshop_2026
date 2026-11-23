@@ -36,7 +36,7 @@ resource "google_organization_iam_member" "admins" {
 
 module "workshop" {
   source   = "./modules/workshop_project"
-  for_each = toset(local.project_numbers)
+  for_each = toset([for number in local.project_numbers : number if number != "2"])
 
   project_id         = format("%s-%02d", var.name_prefix, tonumber(each.key))
   project_name       = format("Workshop %02d", tonumber(each.key))
@@ -49,7 +49,29 @@ module "workshop" {
   budget_currency    = var.budget_currency
   budget_thresholds  = var.budget_alert_thresholds
   role               = var.participant_role
-  members            = lookup(var.assignments, each.key, [])
+  members            = contains(["1", "3"], each.key) ? [] : lookup(var.assignments, each.key, [])
+}
+
+module "participant_project" {
+  source = "./modules/workshop_project"
+
+  project_id         = format("%s-%02d", var.name_prefix, 2)
+  project_name       = "Workshop 02"
+  org_id             = var.org_id
+  folder_id          = var.folder_id
+  billing_account_id = var.billing_account_id
+  apis               = local.enabled_apis
+  notebook_region    = var.notebook_region
+  budget_amount      = var.budget_amount
+  budget_currency    = var.budget_currency
+  budget_thresholds  = var.budget_alert_thresholds
+  role               = var.participant_role
+  members            = []
+}
+
+moved {
+  from = module.workshop["2"]
+  to   = module.participant_project
 }
 
 module "shared" {
@@ -70,10 +92,7 @@ module "shared" {
 }
 
 resource "google_project_iam_member" "shared_bigquery_viewers" {
-  for_each = merge(
-    { for member in toset([for viewer in local.shared_viewers : can(regex("^(user|group|serviceAccount):", viewer)) ? viewer : "user:${viewer}"]) : "viewer:${member}" => member if var.shared_project_role != "roles/bigquery.dataViewer" },
-    { for number, project in module.workshop : "project:${number}" => "serviceAccount:${project.dataform_service_account_email}" }
-  )
+  for_each = { for member in toset([for viewer in local.shared_viewers : can(regex("^(user|group|serviceAccount):", viewer)) ? viewer : "user:${viewer}"]) : "viewer:${member}" => member if var.shared_project_role != "roles/bigquery.dataViewer" }
 
   project = module.shared.project_id
   role    = "roles/bigquery.dataViewer"
@@ -81,20 +100,9 @@ resource "google_project_iam_member" "shared_bigquery_viewers" {
 }
 
 resource "google_storage_bucket_iam_member" "shared_csv_viewers" {
-  for_each = merge(
-    { for member in toset([for viewer in local.shared_viewers : can(regex("^(user|group|serviceAccount):", viewer)) ? viewer : "user:${viewer}"]) : "viewer:${member}" => member },
-    { for number, project in module.workshop : "project:${number}" => "serviceAccount:${project.dataform_service_account_email}" }
-  )
+  for_each = { for member in toset([for viewer in local.shared_viewers : can(regex("^(user|group|serviceAccount):", viewer)) ? viewer : "user:${viewer}"]) : "viewer:${member}" => member }
 
   bucket = module.shared.csv_bucket_name
   role   = "roles/storage.objectViewer"
   member = each.value
-}
-
-resource "google_storage_bucket_iam_member" "dataform_csv_bucket_viewers" {
-  for_each = module.workshop
-
-  bucket = module.shared.csv_bucket_name
-  role   = "roles/storage.bucketViewer"
-  member = "serviceAccount:${each.value.dataform_service_account_email}"
 }

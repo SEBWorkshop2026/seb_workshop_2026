@@ -2,11 +2,11 @@
 
 This project reads the three shared BigQuery source tables and the three CSV
 sources into six native BigQuery tables in a participant project's `bronze`
-dataset. CSV external tables are created in the participant project's
-`external` dataset. The silver and gold models are created in the participant project's
-`silver` and `gold` datasets. All four datasets are in `EU` and are created by the
-workshop Terraform, not by Dataform. All bronze, silver and gold tables are
-partitioned monthly by `reporting_date`.
+dataset. CSV external tables are created in `external`, and the silver and gold
+models in `silver` and `gold`. In workshop project 02, each participant's
+repository appends their slot number to these datasets, such as `bronze_1`.
+All datasets are in `EU` and created by the workshop Terraform, not by Dataform.
+All bronze, silver and gold tables are partitioned monthly by `reporting_date`.
 
 Every bronze, silver and gold model retains a snapshot for each loaded reporting
 period. Each run replaces only the selected period, including when periods are
@@ -71,13 +71,15 @@ deduplicate events across snapshots when counting defaults.
 1. Apply the workshop Terraform configuration, including the bucket permissions.
    Load the sample data into `ws2026-shared.banking_sample` and the shared CSV
    bucket using the generator.
-2. Create a Dataform repository and workspace in the participant project. To
-   upload this directory to the workspace linked in the workshop, run from
-   the workshop repository:
+2. In project 02, Terraform creates a repository `participant-N` for each
+   slot. Create a workspace in that repository. In other workshop projects,
+   create a repository and workspace as before. To upload this directory to
+   a workspace, run from the workshop repository:
 
    ```sh
    gcloud auth login
-   python3 scripts/upload_dataform.py
+   python3 scripts/upload_dataform.py \
+     --project ws2026-02 --repository participant-1 --workspace YOUR_WORKSPACE
    ```
 
    The defaults are project `ws2026-01`, location `europe-west1`, repository
@@ -99,13 +101,14 @@ deduplicate events across snapshots when counting defaults.
    Dataform if needed. Dataform requires `workflow_settings.yaml` at the
    repository root; connecting this workshop repository unchanged leaves the
    file in a subdirectory.
-3. Configure the repository to run using that project's `dataform-workflows`
-   service account. The account needs permission to create tables in the
-   participant project's datasets (created by Terraform), run BigQuery jobs, read the shared tables, and
-   read the CSV bucket and its metadata. The workshop Terraform grants these
-   permissions, subject to dataset restrictions and organization policies.
-4. `workflow_settings.yaml` defaults to `ws2026-01`. Set `defaultProject` to
-   your participant project or override `defaultDatabase` at compilation. Set
+3. Select **Execute with user credentials** when manually
+   running a workspace, then authorize your Google Account. The repository's
+   workspace compilation overrides in project 02 select that project and
+   suffix output datasets with the slot number. Terraform grants the assigned
+   user access to those datasets, shared tables and the CSV bucket.
+4. `workflow_settings.yaml` defaults to `ws2026-01`. For project 02, the
+   workspace override selects `ws2026-02`. For other compilation methods, set
+   `defaultDatabase` and the appropriate `schemaSuffix` explicitly. Set
    `csv_bucket` to the actual `terraform output -raw shared_csv_bucket` value
    if it differs from `ws2026-shared-csv`.
 
@@ -135,20 +138,11 @@ remote configured:
 }
 ```
 
-Check `compilationErrors` in the response. Then call
-[workflowInvocations.create](https://cloud.google.com/dataform/reference/rest/v1/projects.locations.repositories.workflowInvocations/create)
-in the same repository with the returned compilation result's full `name`:
-
-```json
-{
-  "compilationResult": "projects/PROJECT/locations/LOCATION/repositories/REPOSITORY/compilationResults/RESULT"
-}
-```
-
-The repository's configured execution account runs the invocation. Check the
-invocation's final state for success. For a different period, create a new
-compilation result with the new period and invoke it. A console release
-configuration can also set compilation variables.
+Check `compilationErrors` in the response. This configuration does not provide
+an execution account for programmatic invocations; run workspaces manually
+with user credentials instead. Workspace overrides do not apply to release
+configurations; explicitly select the slot's schema suffix when configuring
+those.
 
 ## Create historical releases
 
@@ -182,7 +176,13 @@ run the releases; run them separately to reload the historical data.
 
 ## Run historical releases
 
-After creating the releases and loading the sample sources, run:
+The runner below does not use user credentials for execution. This Terraform
+configuration no longer creates an execution account, so the runner requires
+separately configured execution credentials and permissions. It will not work
+with the user-credential-only setup above.
+
+After configuring execution credentials, creating the releases and loading the
+sample sources, run:
 
 ```sh
 python3 scripts/run_historical_releases.py --project YOUR_PARTICIPANT_PROJECT

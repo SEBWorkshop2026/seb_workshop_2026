@@ -42,6 +42,40 @@ bucket and backend prefix.
 
 GCP budgets send alerts; they do not stop spending.
 
+## Virtual participant setup
+
+Workshop project 02 hosts 50 virtual participant slots by default; set
+`participant_count` to change this. Each slot has a Dataform repository named
+`participant-N` and EU datasets `external_N`, `bronze_N`, `silver_N`, `gold_N`
+and `credit_memos_N`. Workspace compilation overrides direct outputs to those
+datasets. Repositories are created empty; create a workspace in each repository
+and upload the [Dataform project](dataform/README.md#setup) before use.
+
+Assignments map each slot to at most one Google user. Assigned users get
+BigQuery job permission in project 02, data editor on their own datasets, and
+Dataform editor on their own repository, not project-wide Dataform repository
+creation or BigQuery data access. Participants can read the shared input data
+and use the shared credit memo connection. They must choose **Execute with user
+credentials** and authorize their Google Account when running Dataform. No
+custom Dataform execution accounts are configured by this repository.
+
+Dataset and repository IAM cannot override broader permissions inherited from
+the organization, project, groups, or grants outside this configuration. Audit
+those grants before relying on isolation. Dataform repository names may be
+listed by other participants. The credit memo connection uses its own
+Google-managed service account to access the PDFs and Gemini.
+
+Project 02 is moved in Terraform state rather than recreated. Review the plan
+before applying: existing participant project-wide grants and the custom
+Dataform execution accounts in all workshop projects are removed. Existing
+Dataform workflows using those accounts must be migrated to user credentials.
+Terraform-managed
+participant access to workshop projects 01 and 03 is also removed. Audit
+inherited or externally managed permissions separately.
+Existing unsuffixed datasets are retained. Reducing `participant_count` can
+delete datasets and their contents; repositories with workspaces may require
+manual cleanup.
+
 ## Organization administrators
 
 To grant the six organization-level administrator roles to individual Google
@@ -147,17 +181,22 @@ unverified-app warnings. `credential.json` is ignored by Git and should be kept
 private. Use `--credentials` to select a different JSON file; custom paths may
 not be ignored by Git.
 
-The script sorts emails and assigns one student to each project starting at 1.
-It fails if the roster is empty, emails are missing or duplicated, or multiple
-active classes have that name. Each successful run replaces
+The script assigns each student a virtual slot in project 02. It preserves
+existing slots when the roster changes, reserves departed students' slots as
+empty, and assigns new students unused higher-numbered slots. It fails if the
+roster is empty, emails are missing or duplicated, or multiple active classes
+have that name. Each successful run replaces
 `classroom-assignments.auto.tfvars.json`; use `--output` to select a different
-file. Set Terraform's `project_count` to at least the number of students;
-Terraform rejects assignments beyond that count.
+file. If `participant_count` differs from 50, pass the same value to
+`--participant-count`. The script reads the existing output to preserve slot
+ownership; do not delete or replace it when syncing a roster. If all slots
+have been used, increase the count. Reassigning an old slot manually can expose
+the previous participant's data; remove or secure that data first.
 
 The JSON variable file replaces the entire `assignments` map from
 `terraform.tfvars`, not just individual entries. Review the generated file
 and Terraform plan before applying: adding or removing students can change
-project assignments and revoke access. Terraform automatically loads the
+participant assignments and revoke access. Terraform automatically loads the
 default file from the repository root; custom outputs outside that directory
 or without the `.auto.tfvars.json` suffix must be supplied with `-var-file`.
 Other variable files or command-line arguments can override the assignments.
@@ -168,25 +207,12 @@ operators.
 ## BigQuery and Dataform
 
 BigQuery and Dataform APIs are enabled in every project, including the shared
-project, even when `enabled_apis` is customized. Each participant project has
-its own `dataform-workflows` service account with BigQuery data editor and job
-user roles. Assigned participants get BigQuery data editor and job user,
-Dataform editor, and permission to use their project's execution account. The
-Dataform service agent can impersonate that account for workflow execution.
+project, even when `enabled_apis` is customized. Project 02 uses the virtual
+participant setup above. The shared project grants BigQuery data viewer to
+assigned participants and extra shared viewers. Jobs should run in the
+participant project. Dataset-level restrictions, organization policies, or
+location mismatches can still prevent access or queries.
 
-When creating a Dataform repository, select the project's
-`dataform-workflows` service account. Run `terraform output
-dataform_service_accounts` to see the account for each project. Assign
-participants through `assignments` and re-apply Terraform to grant them access.
-The shared project grants BigQuery data viewer to assigned participants, extra
-shared viewers, and each project's Dataform execution account, allowing queries
-and workflows to read shared datasets. Jobs should run in the participant's
-project; access to shared data does not grant shared-project job creation.
-Dataset-level restrictions, organization policies, or location mismatches can
-still prevent access or queries.
-
-These roles allow participants to create BigQuery jobs and modify data in their
-own projects, and to run Dataform workflows using the execution account.
 BigQuery usage can incur charges, and budgets do not enforce a spending limit.
 
 Each participant project also gets a custom-mode VPC named `default` with one
@@ -198,9 +224,8 @@ A `Workshop` runtime template in the same region pins the network and subnetwork
 The [Dataform project](dataform/README.md) loads one chosen reporting date from
 the shared BigQuery and CSV sources into bronze tables, cleans and casts them
 into silver tables, then builds a gold star schema and loan snapshot in a
-participant project. Terraform creates the `external`, `bronze`, `silver` and
-`gold` datasets (EU) in every workshop project, and the PDF extraction session
-adds a `credit_memos` dataset.
+participant project. The virtual participant setup creates suffixed datasets
+in project 02; the original unsuffixed datasets remain in the workshop projects.
 
 ## Load synthetic banking data
 
@@ -209,8 +234,8 @@ After applying Terraform, authenticate application default credentials with
 named `<shared-project-id>-csv` for the CSV source data. Its name must be
 globally available; set `shared_csv_bucket_name` to a different globally unique
 name if it is already taken. Storage API is enabled in the shared project even
-when omitted from `enabled_apis`. Assigned participants, extra shared viewers,
-and workshop Dataform service accounts have object viewer access. The Terraform
+when omitted from `enabled_apis`. Assigned participants and extra shared viewers
+have object viewer access. The Terraform
 operator needs permission to create the bucket and manage its IAM policy. An
 administrator loading data needs BigQuery dataset creation, table creation/update
 and job creation permissions, as well as permission to read the bucket metadata

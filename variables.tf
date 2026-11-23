@@ -48,6 +48,22 @@ variable "shared_csv_bucket_name" {
 variable "project_count" {
   type    = number
   default = 20
+
+  validation {
+    condition     = var.project_count >= 2 && var.project_count == floor(var.project_count)
+    error_message = "project_count must be a whole number of at least 2."
+  }
+}
+
+variable "participant_count" {
+  description = "Number of virtual participant slots in workshop project 02."
+  type        = number
+  default     = 50
+
+  validation {
+    condition     = var.participant_count >= 1 && var.participant_count <= 1000 && var.participant_count == floor(var.participant_count)
+    error_message = "participant_count must be a whole number between 1 and 1000."
+  }
 }
 
 variable "budget_amount" {
@@ -83,23 +99,37 @@ variable "notebook_region" {
   default     = "europe-central2"
 }
 
+variable "dataform_region" {
+  description = "Region for participant Dataform repositories."
+  type        = string
+  default     = "europe-west1"
+}
+
 variable "participant_role" {
   description = "Role granted to a participant on their own project."
   type        = string
   default     = "roles/editor"
 }
 
-# Key = project number as string ("1".."20"); value = emails (user:, group: or
-# serviceAccount: prefix optional; bare emails are treated as users).
+# Keys identify virtual participant slots.
 variable "assignments" {
-  description = "Map of project number => list of emails with access."
+  description = "Map of participant slot => zero or one Google user email."
   type        = map(list(string))
   default     = {}
   validation {
     condition = alltrue([
-      for k in keys(var.assignments) : can(tonumber(k)) && tonumber(k) >= 1 && tonumber(k) <= var.project_count
+      for k, members in var.assignments :
+      can(regex("^[1-9][0-9]*$", k)) && try(tonumber(k) <= var.participant_count, false) &&
+      length(members) <= 1 &&
+      alltrue([for member in members : can(regex("^(user:)?[^[:space:]@:]+@[^[:space:]@:]+$", member))])
     ])
-    error_message = "assignments keys must be project numbers between 1 and project_count."
+    error_message = "assignments must use participant slots between 1 and participant_count, each with at most one user email."
+  }
+  validation {
+    condition = length(distinct([
+      for member in flatten(values(var.assignments)) : lower(trimprefix(member, "user:"))
+    ])) == length(flatten(values(var.assignments)))
+    error_message = "A user cannot be assigned to more than one participant slot."
   }
 }
 

@@ -21,13 +21,17 @@ module "pdf_extraction" {
   memo_source_dir   = var.credit_memo_source_dir
   extra_viewers     = var.shared_project_viewers
 
-  participant_projects = {
+  participant_projects = merge({
     for number, project in module.workshop : number => {
-      project_id               = project.project_id
-      dataform_service_account = project.dataform_service_account_email
-      members                  = lookup(var.assignments, number, [])
+      project_id = project.project_id
+      members    = contains(["1", "3"], number) ? [] : lookup(var.assignments, number, [])
     }
-  }
+    }, {
+    "2" = {
+      project_id = module.participant_project.project_id
+      members    = flatten(values(var.assignments))
+    }
+  })
 }
 
 output "credit_memo_bucket" {

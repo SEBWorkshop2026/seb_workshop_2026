@@ -34,11 +34,10 @@ variable "memo_source_dir" {
 }
 
 variable "participant_projects" {
-  description = "Workshop projects keyed by project number: project ID, Dataform execution account and assigned members."
+  description = "Workshop projects keyed by project number: project ID and assigned members."
   type = map(object({
-    project_id               = string
-    dataform_service_account = string
-    members                  = list(string)
+    project_id = string
+    members    = list(string)
   }))
 }
 

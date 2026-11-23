@@ -7,7 +7,7 @@
 #     "google-auth-httplib2",
 # ]
 # ///
-"""Generate Terraform project assignments from an active Google Classroom roster."""
+"""Generate stable virtual participant assignments from a Google Classroom roster."""
 
 import argparse
 import getpass
@@ -87,11 +87,14 @@ def main():
     parser.add_argument("--class-name", required=True, help="Exact name of an active class you teach")
     parser.add_argument("--credentials", type=Path, default=Path("credential.json"), help="JSON file containing an access_token")
     parser.add_argument("--authorize", action="store_true", help="Replace the saved token using OAuth Playground")
+    parser.add_argument("--participant-count", type=int, default=50, help="Available participant slots (default: 50)")
     parser.add_argument("--output", type=Path, default=Path("classroom-assignments.auto.tfvars.json"))
     args = parser.parse_args()
 
     if args.output.resolve() == args.credentials.resolve():
         parser.error("Output and credentials must be different files")
+    if args.participant_count < 1:
+        parser.error("--participant-count must be positive")
 
     authorized = args.authorize
     if authorized:
@@ -111,9 +114,9 @@ def main():
         print("The saved Classroom token is expired or invalid; authorization is required.")
         token = authorize(args.credentials)
         students = classroom_students(classroom_service(token), args.class_name)
-    assignments = make_assignments(students)
+    assignments = make_assignments(students, read_assignments(args.output), args.participant_count)
     write_assignments(args.output, assignments)
-    print(f"Wrote {len(assignments)} student assignments to {args.output}")
+    print(f"Wrote {len(students)} student assignments to {args.output}")
 
 
 def classroom_students(service, class_name):
@@ -144,7 +147,18 @@ def classroom_students(service, class_name):
             return students
 
 
-def make_assignments(students):
+def read_assignments(path):
+    try:
+        with path.open(encoding="utf-8") as assignment_file:
+            data = json.load(assignment_file)
+    except FileNotFoundError:
+        return {}
+    if not isinstance(data, dict) or set(data) != {"assignments"} or not isinstance(data["assignments"], dict):
+        raise ValueError(f"Expected an assignments object in {path}; refusing to overwrite it")
+    return data["assignments"]
+
+
+def make_assignments(students, existing=None, participant_count=50):
     if not students:
         raise ValueError("Class roster is empty; refusing to generate empty assignments")
 
@@ -158,7 +172,36 @@ def make_assignments(students):
             raise ValueError(f"Duplicate student email: {email}")
         seen.add(email.casefold())
         emails.append(email)
-    return {str(index): [email] for index, email in enumerate(sorted(emails, key=str.casefold), 1)}
+    by_email = {email.casefold(): email for email in emails}
+    assigned = set()
+    result = {}
+    for slot, members in (existing or {}).items():
+        if not isinstance(slot, str) or not re.fullmatch(r"[1-9][0-9]*", slot) or int(slot) > participant_count:
+            raise ValueError(f"Invalid existing participant slot: {slot!r}")
+        if not isinstance(members, list) or len(members) > 1:
+            raise ValueError(f"Existing participant slot {slot} must contain at most one user")
+        result[slot] = []
+        if members:
+            member = members[0]
+            if not isinstance(member, str):
+                raise ValueError(f"Invalid user in participant slot {slot}")
+            email = member.removeprefix("user:")
+            if not re.fullmatch(r"[^\s@:]+@[^\s@:]+", email):
+                raise ValueError(f"Invalid user in participant slot {slot}")
+            key = email.casefold()
+            if key in assigned:
+                raise ValueError(f"Duplicate user in existing assignments: {email}")
+            assigned.add(key)
+            if key in by_email:
+                result[slot] = [by_email[key]]
+
+    next_slot = max((int(slot) for slot in result), default=0) + 1
+    for key in sorted(by_email.keys() - assigned):
+        if next_slot > participant_count:
+            raise ValueError("Not enough unused participant slots; increase participant_count and --participant-count")
+        result[str(next_slot)] = [by_email[key]]
+        next_slot += 1
+    return dict(sorted(result.items(), key=lambda item: int(item[0])))
 
 
 def write_assignments(path, assignments):
