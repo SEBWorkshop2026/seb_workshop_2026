@@ -97,7 +97,27 @@ that access accordingly.
 
 ## Assign Classroom students to projects
 
-Put a Google OAuth access token in the local `credential.json` file:
+Run the script with `uv` from the repository root. `uv` installs its declared
+dependencies automatically:
+
+```sh
+uv run scripts/assign_classroom_projects.py \
+  --class-name "YOUR CLASS NAME"
+terraform plan
+terraform apply
+```
+
+If `credential.json` does not exist, the script opens Google's OAuth Playground
+with the Classroom scopes selected. Click **Authorize APIs**, sign in as a
+teacher of the active class, and grant access. Click **Exchange authorization
+code for tokens**, copy the **Access token** (not the refresh token), and paste
+it into the terminal prompt. The input is hidden. The script saves the token in
+`credential.json`, restricts the file to the current user, and continues with
+the assignment. If the browser does not open, use the printed link. No custom
+OAuth client is required.
+
+The script reuses an existing `credential.json`. Alternatively, create it
+yourself:
 
 ```json
 {"access_token": "YOUR_ACCESS_TOKEN"}
@@ -111,21 +131,21 @@ https://www.googleapis.com/auth/classroom.rosters.readonly
 https://www.googleapis.com/auth/classroom.profile.emails
 ```
 
-You can obtain a token with [Google's OAuth Playground](https://developers.google.com/oauthplayground/).
-The token expires and cannot be refreshed by this script; replace it when
-needed. Access to the Classroom API and roster must be allowed for the
-authorized account. `credential.json` is ignored by Git and should be kept
-private. Use `--credentials` to select a different JSON file.
-
-Run the script with `uv` from the repository root. `uv` installs its declared
-dependencies automatically:
+When Classroom rejects the saved token as expired or invalid, the script opens
+the Playground and asks for a replacement, then retries once. This requires an
+interactive terminal and your sign-in and consent; the token is not refreshed
+automatically. You can also replace it explicitly:
 
 ```sh
 uv run scripts/assign_classroom_projects.py \
-  --class-name "YOUR CLASS NAME"
-terraform plan
-terraform apply
+  --class-name "YOUR CLASS NAME" --authorize
 ```
+
+Access to the Classroom API and roster must be allowed for the authorized
+account. Playground's OAuth client may be subject to Google's restrictions or
+unverified-app warnings. `credential.json` is ignored by Git and should be kept
+private. Use `--credentials` to select a different JSON file; custom paths may
+not be ignored by Git.
 
 The script sorts emails and assigns one student to each project starting at 1.
 It fails if the roster is empty, emails are missing or duplicated, or multiple
