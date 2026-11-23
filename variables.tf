@@ -72,8 +72,15 @@ variable "enabled_apis" {
   default = [
     "compute.googleapis.com",
     "storage.googleapis.com",
-    "run.googleapis.com"
+    "run.googleapis.com",
+    "aiplatform.googleapis.com"
   ]
+}
+
+variable "notebook_region" {
+  description = "Region of the subnet in each workshop project's \"default\" VPC, used by BigQuery Studio (Colab Enterprise) notebook runtimes."
+  type        = string
+  default     = "europe-central2"
 }
 
 variable "participant_role" {
