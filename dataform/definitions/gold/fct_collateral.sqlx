@@ -1,7 +1,6 @@
 config {
   type: "incremental",
-  schema: "silver",
-  dependencies: ["create_datasets"],
+  schema: "gold",
   bigquery: {
     partitionBy: "DATE_TRUNC(reporting_date, MONTH)"
   }
@@ -11,6 +10,14 @@ pre_operations {
   ${when(incremental(), `DELETE FROM ${self()} WHERE reporting_date = DATE '${reportingDate()}'`)}
 }
 
-SELECT DISTINCT loan_id, default_date, reporting_date
-FROM ${ref("bronze", "defaults")}
+SELECT
+  collateral_id,
+  loan_id,
+  reporting_date,
+  property_id,
+  property_value,
+  currency,
+  collateral_type,
+  loan_to_value_ratio
+FROM ${ref("silver", "collateral")}
 WHERE reporting_date = DATE '${reportingDate()}'

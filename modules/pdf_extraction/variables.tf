@@ -21,6 +21,12 @@ variable "connection_id" {
   default     = "credit_memos"
 }
 
+variable "dataset_id" {
+  description = "BigQuery dataset created in every participant project for the credit memo object table and extraction results."
+  type        = string
+  default     = "credit_memos"
+}
+
 variable "memo_source_dir" {
   description = "Local directory with pdf/*.pdf and ground_truth.csv (output of gen_memos.py). Null skips the upload."
   type        = string

@@ -1,7 +1,6 @@
 config {
   type: "incremental",
   schema: "gold",
-  dependencies: ["create_datasets"],
   assertions: {
     nonNull: ["loan_id", "reporting_date"],
     uniqueKey: ["loan_id", "reporting_date"]
@@ -68,28 +67,28 @@ SELECT
   c.collateral_type,
   c.loan_to_value_ratio,
   f.default_date
-FROM ${ref("silver", "dim_loan")} l
-LEFT JOIN ${ref("silver", "fct_loan_balance")} b
+FROM ${ref("gold", "dim_loan")} l
+LEFT JOIN ${ref("gold", "fct_loan_balance")} b
   ON l.loan_id = b.loan_id
   AND l.reporting_date = b.reporting_date
-LEFT JOIN ${ref("silver", "bridge_loan_debtor")} primary_bridge
+LEFT JOIN ${ref("gold", "bridge_loan_debtor")} primary_bridge
   ON l.loan_id = primary_bridge.loan_id
   AND l.reporting_date = primary_bridge.reporting_date
   AND primary_bridge.role = 'primary'
-LEFT JOIN ${ref("silver", "dim_debtor")} d
+LEFT JOIN ${ref("gold", "dim_debtor")} d
   ON primary_bridge.debtor_id = d.debtor_id
   AND primary_bridge.reporting_date = d.reporting_date
-LEFT JOIN ${ref("silver", "bridge_loan_debtor")} co_bridge
+LEFT JOIN ${ref("gold", "bridge_loan_debtor")} co_bridge
   ON l.loan_id = co_bridge.loan_id
   AND l.reporting_date = co_bridge.reporting_date
   AND co_bridge.role = 'co'
-LEFT JOIN ${ref("silver", "dim_debtor")} cd
+LEFT JOIN ${ref("gold", "dim_debtor")} cd
   ON co_bridge.debtor_id = cd.debtor_id
   AND co_bridge.reporting_date = cd.reporting_date
-LEFT JOIN ${ref("silver", "fct_collateral")} c
+LEFT JOIN ${ref("gold", "fct_collateral")} c
   ON l.loan_id = c.loan_id
   AND l.reporting_date = c.reporting_date
-LEFT JOIN ${ref("silver", "fct_default")} f
+LEFT JOIN ${ref("gold", "fct_default")} f
   ON l.loan_id = f.loan_id
   AND l.reporting_date = f.reporting_date
 WHERE l.reporting_date = DATE '${reportingDate()}'

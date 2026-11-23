@@ -1,9 +1,10 @@
 # PDF AI extraction session: credit memo archive and per-participant Gemini access.
 #
 # Shared project: one private EU bucket with the credit memo PDFs and the label file.
-# Each participant project: BigQuery Connection and Agent Platform (Vertex AI) APIs, a Cloud resource
-# connection in EU whose service account reads the bucket and calls Gemini, and permission for the
-# participants and the project's Dataform execution account to use that connection.
+# Each participant project: BigQuery Connection and Agent Platform (Vertex AI) APIs, a credit memo
+# dataset, a Cloud resource connection in EU whose service account reads the bucket and calls Gemini,
+# and permission for the participants and the project's Dataform execution account to use that
+# connection.
 
 terraform {
   required_providers {
@@ -103,6 +104,17 @@ resource "google_bigquery_connection" "gemini" {
   cloud_resource {}
 
   depends_on = [google_project_service.apis]
+}
+
+# dataset for the object table over the PDFs and the extraction results
+resource "google_bigquery_dataset" "memos" {
+  for_each = var.participant_projects
+
+  project                    = each.value.project_id
+  dataset_id                 = var.dataset_id
+  location                   = var.location
+  description                = "Credit memo object table and Gemini extraction results."
+  delete_contents_on_destroy = true
 }
 
 # the connection's service account reads the PDFs ...

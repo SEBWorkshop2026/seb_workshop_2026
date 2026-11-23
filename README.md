@@ -176,8 +176,11 @@ Enterprise, whose default runtime uses this network.
 A `Workshop` runtime template in the same region pins the network and subnetwork.
 
 The [Dataform project](dataform/README.md) loads one chosen reporting date from
-the shared BigQuery and CSV sources into bronze tables, then builds silver
-dimensions and facts and a gold loan snapshot in a participant project.
+the shared BigQuery and CSV sources into bronze tables, cleans and casts them
+into silver tables, then builds a gold star schema and loan snapshot in a
+participant project. Terraform creates the `external`, `bronze`, `silver` and
+`gold` datasets (EU) in every workshop project, and the PDF extraction session
+adds a `credit_memos` dataset.
 
 ## Load synthetic banking data
 

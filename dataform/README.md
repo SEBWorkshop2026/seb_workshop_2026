@@ -4,19 +4,38 @@ This project reads the three shared BigQuery source tables and the three CSV
 sources into six native BigQuery tables in a participant project's `bronze`
 dataset. CSV external tables are created in the participant project's
 `external` dataset. The silver and gold models are created in the participant project's
-`silver` and `gold` datasets. All four datasets are in `EU`; bronze tables are partitioned
-monthly by `reporting_date`.
+`silver` and `gold` datasets. All four datasets are in `EU` and are created by the
+workshop Terraform, not by Dataform. All bronze, silver and gold tables are
+partitioned monthly by `reporting_date`.
+
+Every bronze, silver and gold model retains a snapshot for each loaded reporting
+period. Each run replaces only the selected period, including when periods are
+loaded out of order. Load each desired reporting period separately.
 
 ## Silver models
 
-Silver models retain a snapshot for each loaded reporting period. Each run
-replaces only the selected period, including when periods are loaded out of
-order. Load each desired reporting period separately.
+Silver has one model per bronze table, with the same name. Silver models only
+clean, cast and rename columns of a single source; they never join or reshape
+data. All type conversions happen here, so gold models contain no casts.
+
+| Model | Cleaning and transformation |
+| --- | --- |
+| `arrangement_account_info` | Origination and maturity are converted from `YYYYMMDD` integers to `DATE`. |
+| `arrangement_balance` | Typed columns from the CSV external table; ingestion metadata dropped. |
+| `collateral` | Typed columns from the CSV external table; ingestion metadata dropped. |
+| `debtor_info` | `debtor_identifier` renamed to `debtor_id`. |
+| `debtor_financial` | `debtor_identifier` renamed to `debtor_id`; ingestion metadata dropped. |
+| `defaults` | Duplicate rows removed within each reporting snapshot. |
+
+## Gold models
+
+Gold contains the star schema built from silver and the one-big-table loan
+snapshot built from the star schema.
 
 | Model | Grain and behavior |
 | --- | --- |
 | `dim_debtor` | One row per debtor and reporting date, joining debtor info and financial snapshots by debtor and date. Missing financial data remains null. |
-| `dim_loan` | One row per loan and reporting date; origination and maturity are converted to `DATE`. |
+| `dim_loan` | One row per loan and reporting date. |
 | `bridge_loan_debtor` | Primary and non-null co-debtor relationships per loan and reporting date, with roles `primary` and `co`. |
 | `fct_loan_balance` | One row per loan and reporting date, including balances, payment, annual percentage rate, status, and invoice due date. |
 | `fct_collateral` | One row per collateral, loan, and reporting date, including property value and the source LTV ratio. |
@@ -25,24 +44,20 @@ order. Load each desired reporting period separately.
 Join dimensions, the bridge, and facts on `reporting_date` as well as their
 entity keys to use matching snapshots. The models assume the source grains
 described in the [sample data documentation](../sample_data/README.md); repeated
-source keys can produce duplicate silver rows within a period. Currency remains
-a column on monetary models, not a separate dimension. All silver tables are
-monthly-partitioned by reporting date. Date attributes can be derived directly
-from the date columns in BigQuery.
-The default fact deduplicates within each reporting snapshot. Since snapshots
-are cumulative, a default appears in multiple periods: filter on
-`reporting_date` or deduplicate by loan and default date when counting events.
-Rerunning a period replaces that snapshot without changing other periods.
-
-## Gold model
+source keys can produce duplicate rows within a period. Currency remains
+a column on monetary models, not a separate dimension. Date attributes can be
+derived directly from the date columns in BigQuery.
+Since default snapshots are cumulative, a default appears in multiple periods:
+filter on `reporting_date` or deduplicate by loan and default date when
+counting events.
 
 `gold.loan_obt` is a monthly-partitioned, incremental one-big-table loan
 snapshot, with one row per loan and reporting date. Dataform assertions check
 that both keys are non-null and that their combination is unique across the
-table. Duplicate matching rows in silver can therefore fail the assertions
+table. Duplicate matching rows in the star schema can therefore fail the assertions
 rather than silently multiplying loans.
 
-The model starts from `dim_loan` and left joins the matching balance, primary
+The `loan_obt` model starts from `dim_loan` and left joins the matching balance, primary
 debtor, co-debtor, collateral, and default snapshots. Debtor and co-debtor
 attributes have separate prefixed columns; missing related records have null
 fields. The model assumes at most one matching record for each relationship
@@ -85,8 +100,8 @@ deduplicate events across snapshots when counting defaults.
    repository root; connecting this workshop repository unchanged leaves the
    file in a subdirectory.
 3. Configure the repository to run using that project's `dataform-workflows`
-   service account. The account needs permission to create datasets and tables
-   in the participant project, run BigQuery jobs, read the shared tables, and
+   service account. The account needs permission to create tables in the
+   participant project's datasets (created by Terraform), run BigQuery jobs, read the shared tables, and
    read the CSV bucket and its metadata. The workshop Terraform grants these
    permissions, subject to dataset restrictions and organization policies.
 4. `workflow_settings.yaml` defaults to `ws2026-01`. Set `defaultProject` to
@@ -212,14 +227,14 @@ three CSV tables before running these models. A full refresh also changes the
 schema, but discards other periods.
 The generator overwrites CSVs, so this pipeline retains the latest loaded
 version of each reporting date, not an immutable history of deliveries.
-If `silver.dim_debtor`, `silver.dim_loan`, or `silver.bridge_loan_debtor`
-already exists from the earlier unpartitioned models, back up any data you
-need, then drop those tables before running the new models. The same applies to
-`silver.fct_default` if it exists from the earlier event-grain model partitioned
-by default date. BigQuery cannot replace a table with a different partitioning
-specification. Rerun each desired reporting period to populate snapshots.
+The star schema moved from `silver` to `gold`. Tables named `dim_debtor`,
+`dim_loan`, `bridge_loan_debtor`, `fct_loan_balance`, `fct_collateral`,
+`fct_default` or `dim_date` left in `silver` by earlier versions are no longer
+maintained; back up any data you need and drop them. Rerun each desired
+reporting period to populate the new silver and gold tables.
 
-The date dimension is no longer defined. Uploading does not delete old
-workspace files, so remove an existing `definitions/silver/dim_date.sqlx`
-from the Dataform workspace separately. Removing its definition does not delete
-an existing BigQuery table.
+Uploading does not delete old workspace files. Remove
+`definitions/create_datasets.sqlx` and the old star schema files under
+`definitions/silver/` (`dim_*`, `fct_*`, `bridge_loan_debtor`) from the
+Dataform workspace separately; they would otherwise duplicate the gold models.
+Removing a definition does not delete an existing BigQuery table.

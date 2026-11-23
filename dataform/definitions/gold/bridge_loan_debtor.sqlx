@@ -1,7 +1,6 @@
 config {
   type: "incremental",
-  schema: "silver",
-  dependencies: ["create_datasets"],
+  schema: "gold",
   bigquery: {
     partitionBy: "DATE_TRUNC(reporting_date, MONTH)"
   }
@@ -13,7 +12,7 @@ pre_operations {
 
 WITH loans AS (
   SELECT loan_id, debtor_id, co_debtor_id, reporting_date
-  FROM ${ref("bronze", "arrangement_account_info")}
+  FROM ${ref("silver", "arrangement_account_info")}
   WHERE reporting_date = DATE '${reportingDate()}'
 )
 

@@ -1,7 +1,6 @@
 config {
   type: "incremental",
-  schema: "silver",
-  dependencies: ["create_datasets"],
+  schema: "gold",
   bigquery: {
     partitionBy: "DATE_TRUNC(reporting_date, MONTH)"
   }
@@ -12,7 +11,7 @@ pre_operations {
 }
 
 SELECT
-  d.debtor_identifier AS debtor_id,
+  d.debtor_id,
   d.reporting_date,
   d.age,
   d.sex,
@@ -28,8 +27,8 @@ SELECT
   f.household_income,
   f.employment_industry,
   f.proposed_risk_class
-FROM ${ref("bronze", "debtor_info")} d
-LEFT JOIN ${ref("bronze", "debtor_financial")} f
-  ON d.debtor_identifier = f.debtor_identifier
+FROM ${ref("silver", "debtor_info")} d
+LEFT JOIN ${ref("silver", "debtor_financial")} f
+  ON d.debtor_id = f.debtor_id
   AND d.reporting_date = f.reporting_date
 WHERE d.reporting_date = DATE '${reportingDate()}'

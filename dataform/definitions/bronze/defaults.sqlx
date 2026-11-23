@@ -1,6 +1,5 @@
 config {
   type: "incremental",
-  dependencies: ["create_datasets"],
   bigquery: {
     partitionBy: "DATE_TRUNC(reporting_date, MONTH)"
   }

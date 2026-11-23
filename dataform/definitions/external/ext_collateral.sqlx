@@ -1,8 +1,7 @@
 config {
   type: "operations",
   schema: "external",
-  hasOutput: true,
-  dependencies: ["create_datasets"]
+  hasOutput: true
 }
 
 CREATE OR REPLACE EXTERNAL TABLE ${self()} (

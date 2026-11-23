@@ -1,7 +1,6 @@
 config {
   type: "incremental",
   schema: "silver",
-  dependencies: ["create_datasets"],
   bigquery: {
     partitionBy: "DATE_TRUNC(reporting_date, MONTH)"
   }
@@ -12,15 +11,14 @@ pre_operations {
 }
 
 SELECT
-  loan_id,
+  debtor_identifier AS debtor_id,
   reporting_date,
-  loan_status,
-  original_principal_balance,
-  current_principal_balance,
-  next_payment_due,
-  currency,
-  interest_rate,
-  interest_type,
-  inv_due_date
-FROM ${ref("bronze", "arrangement_balance")}
+  age,
+  sex,
+  education,
+  politically_exposed,
+  underage_children_count,
+  family_status,
+  residence_region
+FROM ${ref("bronze", "debtor_info")}
 WHERE reporting_date = DATE '${reportingDate()}'
