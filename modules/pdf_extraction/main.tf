@@ -111,6 +111,17 @@ resource "google_bigquery_dataset" "memos" {
   delete_contents_on_destroy = true
 }
 
+# participants read the shared lab objects in this dataset (object table, remote models, labels, prices,
+# reference extractions; created once by lab/setup_shared.sql) and write only to their own credit_memos_N
+resource "google_bigquery_dataset_iam_member" "memo_readers" {
+  for_each = local.connection_users
+
+  project    = google_bigquery_dataset.memos[each.value.number].project
+  dataset_id = google_bigquery_dataset.memos[each.value.number].dataset_id
+  role       = "roles/bigquery.dataViewer"
+  member     = each.value.member
+}
+
 # the connection's service account reads the PDFs ...
 resource "google_storage_bucket_iam_member" "connection_reader" {
   for_each = google_bigquery_connection.gemini
